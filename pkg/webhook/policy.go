@@ -404,6 +404,17 @@ func (h *validationHandler) tracingLevel(ctx context.Context, req admission.Requ
 			}
 		}
 	}
+	obj := &unstructured.Unstructured{}
+	if _, _, err := deserializer.Decode(req.AdmissionRequest.Object.Raw, nil, obj); err == nil {
+		annotations := obj.GetAnnotations()
+
+		if tracingAnnotation, exists := annotations["admission.gatekeeper.sh/trace"]; exists && tracingAnnotation == "true" {
+			traceEnabled = true
+		}
+		if dumpAnnotation, exists := annotations["admission.gatekeeper.sh/dump"]; exists && dumpAnnotation == "true" {
+			dump = true
+		}
+	}
 	return traceEnabled, dump
 }
 
