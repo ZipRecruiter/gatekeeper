@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -221,6 +222,8 @@ func (h *validationHandler) Handle(ctx context.Context, req admission.Request) a
 	return admission.ValidationResponse(true, "")
 }
 
+var myHostname string
+
 func (h *validationHandler) getDenyMessages(res []*rtypes.Result, req admission.Request) []string {
 	var msgs []string
 	var resourceName string
@@ -233,6 +236,13 @@ func (h *validationHandler) getDenyMessages(res []*rtypes.Result, req admission.
 			if _, _, err := deserializer.Decode(req.AdmissionRequest.Object.Raw, nil, obj); err == nil {
 				resourceName = obj.GetName()
 			}
+		}
+	}
+	if myHostname == "" {
+		var err error
+		myHostname, err = os.Hostname()
+		if err != nil {
+			myHostname = "<unknown host>"
 		}
 	}
 	for _, r := range res {
@@ -249,6 +259,7 @@ func (h *validationHandler) getDenyMessages(res []*rtypes.Result, req admission.
 					"resource_name", resourceName,
 					"request_username", req.AdmissionRequest.UserInfo.Username,
 					"violation_message", r.Msg,
+					"which_pod", myHostname,
 				).Info("denied admission")
 			}
 			if *emitAdmissionEvents {
