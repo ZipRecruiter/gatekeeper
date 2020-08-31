@@ -246,6 +246,7 @@ func (h *validationHandler) getValidationMessages(res []*rtypes.Result, req *adm
 				logging.ResourceNamespace, req.AdmissionRequest.Namespace,
 				logging.ResourceName, resourceName,
 				logging.RequestUsername, req.AdmissionRequest.UserInfo.Username,
+				"violation_message", r.Msg,
 			).Info("denied admission")
 		}
 		if *emitAdmissionEvents {
