@@ -137,9 +137,32 @@ const (
 	unknownResponse requestResponse = "unknown"
 )
 
+func getResourceName(req admission.Request, fallback string) string {
+	resourceName := req.AdmissionRequest.Name
+	if len(resourceName) == 0 && req.AdmissionRequest.Object.Raw != nil {
+		// On a CREATE operation, the client may omit name and
+		// rely on the server to generate the name.
+		obj := &unstructured.Unstructured{}
+		if _, _, err := deserializer.Decode(req.AdmissionRequest.Object.Raw, nil, obj); err == nil {
+			resourceName = obj.GetName()
+		}
+	}
+	if len(resourceName) == 0 {
+		resourceName = fallback
+	}
+	return resourceName
+}
+
 // Handle the validation request
 func (h *validationHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	log := log.WithValues("hookType", "validation")
+
+	resourceName := getResourceName(req, "<unknown>")
+
+	log.Info("handling admission request",
+		"resource_name", resourceName,
+		"resource_namespace", req.AdmissionRequest.Namespace,
+		"operation", req.AdmissionRequest.Operation)
 
 	var timeStart = time.Now()
 
@@ -225,15 +248,7 @@ func (h *validationHandler) getDenyMessages(res []*rtypes.Result, req admission.
 	var msgs []string
 	var resourceName string
 	if len(res) > 0 && (*logDenies || *emitAdmissionEvents) {
-		resourceName = req.AdmissionRequest.Name
-		if len(resourceName) == 0 && req.AdmissionRequest.Object.Raw != nil {
-			// On a CREATE operation, the client may omit name and
-			// rely on the server to generate the name.
-			obj := &unstructured.Unstructured{}
-			if _, _, err := deserializer.Decode(req.AdmissionRequest.Object.Raw, nil, obj); err == nil {
-				resourceName = obj.GetName()
-			}
-		}
+		resourceName = getResourceName(req, "")
 	}
 	for _, r := range res {
 		if r.EnforcementAction == "deny" || r.EnforcementAction == "dryrun" {
