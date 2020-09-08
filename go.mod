@@ -20,7 +20,7 @@ require (
 	github.com/prometheus/client_golang v1.1.0
 	github.com/stretchr/testify v1.5.1 // indirect
 	go.opencensus.io v0.22.2
-	go.uber.org/zap v1.10.0
+	go.uber.org/zap v1.11.0
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
