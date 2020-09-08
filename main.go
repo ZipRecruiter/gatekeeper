@@ -130,23 +130,45 @@ func main() {
 		}()
 	}
 
+	host := os.Getenv("SOURCE_HOST")
+	if host == "" {
+		var err error
+		host, err = os.Hostname()
+		if err != nil {
+			fmt.Println("Can't get hostname for logger from SOURCE_HOST or os.Hostname:", err.Error())
+			os.Exit(1)
+		}
+	}
+
+	loggerOpts := []zap.Option{
+		zap.Fields(zap.String("@tag", "gatekeeper"), zap.String("source_host", host)),
+	}
+
 	switch *logLevel {
 	case "DEBUG":
 		eCfg := zap.NewDevelopmentEncoderConfig()
-		eCfg.LevelKey = *logLevelKey
-		eCfg.EncodeLevel = encoder
-		logger := crzap.New(crzap.UseDevMode(true), crzap.Encoder(zapcore.NewConsoleEncoder(eCfg)))
+		setupEncoderConfig(encoder, &eCfg)
+
+		logger := crzap.New(
+			crzap.UseDevMode(true),
+			crzap.Encoder(zapcore.NewJSONEncoder(eCfg)),
+			crzap.WriteTo(os.Stdout),
+			crzap.RawZapOpts(loggerOpts...))
 		ctrl.SetLogger(logger)
 		klog.SetLogger(logger)
 	case "WARNING", "ERROR":
-		setLoggerForProduction(encoder)
+		setLoggerForProduction(loggerOpts, encoder)
 	case "INFO":
 		fallthrough
 	default:
 		eCfg := zap.NewProductionEncoderConfig()
-		eCfg.LevelKey = *logLevelKey
-		eCfg.EncodeLevel = encoder
-		logger := crzap.New(crzap.UseDevMode(false), crzap.Encoder(zapcore.NewJSONEncoder(eCfg)))
+		setupEncoderConfig(encoder, &eCfg)
+
+		logger := crzap.New(
+			crzap.UseDevMode(false),
+			crzap.Encoder(zapcore.NewJSONEncoder(eCfg)),
+			crzap.WriteTo(os.Stdout),
+			crzap.RawZapOpts(loggerOpts...))
 		ctrl.SetLogger(logger)
 		klog.SetLogger(logger)
 	}
@@ -314,12 +336,13 @@ func setupControllers(mgr ctrl.Manager, sw *watch.ControllerSwitch, tracker *rea
 	}
 }
 
-func setLoggerForProduction(encoder zapcore.LevelEncoder) {
-	sink := zapcore.AddSync(os.Stderr)
-	var opts []zap.Option
+func setLoggerForProduction(loggerOpts []zap.Option, encoder zapcore.LevelEncoder) {
+	sink := zapcore.AddSync(os.Stdout)
+	opts := make([]zap.Option, len(loggerOpts))
+	copy(opts, loggerOpts)
 	encCfg := zap.NewProductionEncoderConfig()
-	encCfg.LevelKey = *logLevelKey
-	encCfg.EncodeLevel = encoder
+	setupEncoderConfig(encoder, &encCfg)
+
 	enc := zapcore.NewJSONEncoder(encCfg)
 	lvl := zap.NewAtomicLevelAt(zap.WarnLevel)
 	opts = append(opts, zap.AddStacktrace(zap.ErrorLevel),
@@ -332,4 +355,12 @@ func setLoggerForProduction(encoder zapcore.LevelEncoder) {
 	newlogger := zapr.NewLogger(zlog)
 	ctrl.SetLogger(newlogger)
 	klog.SetLogger(newlogger)
+}
+
+func setupEncoderConfig(encoder zapcore.LevelEncoder, eCfg *zapcore.EncoderConfig) {
+	eCfg.LevelKey = *logLevelKey
+	eCfg.EncodeLevel = encoder
+	eCfg.TimeKey = "@timestamp"
+	eCfg.MessageKey = "message"
+	eCfg.EncodeTime = zapcore.RFC3339NanoTimeEncoder
 }
