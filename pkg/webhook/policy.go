@@ -369,6 +369,7 @@ func (h *validationHandler) validateConstraint(ctx context.Context, req admissio
 // traceSwitch returns true if a request should be traced
 func (h *validationHandler) reviewRequest(ctx context.Context, req admission.Request) (*rtypes.Responses, error) {
 	trace, dump := h.tracingLevel(ctx, req)
+	dump = true
 	review := &target.AugmentedReview{AdmissionRequest: &req.AdmissionRequest}
 	if req.AdmissionRequest.Namespace != "" {
 		ns := &corev1.Namespace{}
